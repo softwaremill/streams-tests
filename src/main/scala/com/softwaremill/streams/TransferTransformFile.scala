@@ -71,7 +71,9 @@ object TransferTransformFileRunner extends App {
 
   val tests = List(
     (ScalazStreamsTransferTransformFile, 10),
-    (AkkaStreamsTransferTransformFile, 10)
+    (ScalazStreamsTransferTransformFile, 100),
+    (AkkaStreamsTransferTransformFile, 10),
+    (AkkaStreamsTransferTransformFile, 100)
   )
 
   runTests(tests.map { case (ttf, sizeMB) =>
