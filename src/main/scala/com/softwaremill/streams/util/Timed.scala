@@ -15,7 +15,7 @@ object Timed {
     println("Warmup")
     for ((name, body) <- tests) {
       val (result, time) = timed { body() }
-      println(f"$name%-25s $result%-25s ${time/100.0d}%4.2fs")
+      println(f"$name%-25s $result%-25s ${time/1000.0d}%4.2fs")
     }
 
     println("---")
@@ -23,7 +23,7 @@ object Timed {
 
     val rawResults = for ((name, body) <- allTests) yield {
       val (result, time) = timed { body() }
-      println(f"$name%-25s $result%-25s ${time/100.0d}%4.2fs")
+      println(f"$name%-25s $result%-25s ${time/1000.0d}%4.2fs")
       name -> time
     }
 
@@ -33,14 +33,14 @@ object Timed {
       val count = times.size
       val mean = times.sum.toDouble / count
       val dev = times.map(t => (t - mean) * (t - mean))
-      val stddev = Math.sqrt(dev.sum / count)
+      val stddev = Math.sqrt(dev.sum / count / 1000.0d)
       (mean, stddev)
     }
 
     println("---")
     println("Averages (name,  mean, stddev)")
     results.toList.sortBy(_._2._1).foreach { case (name, (mean, stddev)) =>
-      println(f"$name%-25s ${mean/100.0d}%4.2fs ${stddev/100.0d}%4.2fs")
+      println(f"$name%-25s ${mean/1000.0d}%4.2fs $stddev%4.2fs")
     }
   }
 }

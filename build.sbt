@@ -11,7 +11,7 @@ val akkaVersion = "2.3.10"
 libraryDependencies ++= Seq(
   // akka
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-  "com.typesafe.akka" %% "akka-stream-experimental" % "1.0-RC2",
+  "com.typesafe.akka" %% "akka-stream-experimental" % "1.0-RC3",
   // scalaz
   "org.scalaz.stream" %% "scalaz-stream" % "0.7a",
   // util

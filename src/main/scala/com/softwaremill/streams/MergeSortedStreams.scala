@@ -70,7 +70,7 @@ object MergeSortedStreamsRunner extends Properties("MergeSortedStreams") {
 }
 
 class SortedMerge[T: Ordering] extends FlexiMerge[T, FanInShape2[T, T, T]](
-  new FanInShape2(Name("SortedMerge")), OperationAttributes.name("SortedMerge")) {
+  new FanInShape2("SortedMerge"), OperationAttributes.name("SortedMerge")) {
 
   import akka.stream.scaladsl.FlexiMerge._
 
