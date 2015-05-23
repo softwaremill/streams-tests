@@ -87,5 +87,7 @@ class SplitRoute[T](splitFn: T => Either[T, T]) extends FlexiRoute[T, FanOutShap
       }
       SameState
     }
+
+    override def initialCompletionHandling = eagerClose
   }
 }
