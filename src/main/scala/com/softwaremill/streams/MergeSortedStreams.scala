@@ -1,7 +1,6 @@
 package com.softwaremill.streams
 
 import akka.actor.ActorSystem
-import akka.stream.FanInShape.Name
 import akka.stream._
 import akka.stream.scaladsl.{FlexiMerge, Sink, Source, FlowGraph}
 import akka.stream.scaladsl.FlowGraph.Implicits._
