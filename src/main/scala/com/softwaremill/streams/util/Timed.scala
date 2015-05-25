@@ -33,14 +33,14 @@ object Timed {
       val count = times.size
       val mean = times.sum.toDouble / count
       val dev = times.map(t => (t - mean) * (t - mean))
-      val stddev = Math.sqrt(dev.sum / count / 1000.0d)
+      val stddev = Math.sqrt(dev.sum / count)
       (mean, stddev)
     }
 
     println("---")
     println("Averages (name,  mean, stddev)")
     results.toList.sortBy(_._2._1).foreach { case (name, (mean, stddev)) =>
-      println(f"$name%-25s ${mean/1000.0d}%4.2fs $stddev%4.2fs")
+      println(f"$name%-25s ${mean/1000.0d}%4.2fs $stddev%4.2fms")
     }
   }
 }
