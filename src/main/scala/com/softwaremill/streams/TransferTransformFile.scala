@@ -46,44 +46,6 @@ object AkkaStreamsTransferTransformFile extends TransferTransformFile {
   }
 }
 
-object ScalazStreamsTransferTransformFile extends TransferTransformFile {
-  override def run(from: File, to: File) = {
-    io.linesR(from.getAbsolutePath)
-      .filter(!_.contains("#!@"))
-      .map(_.replace("*", "0"))
-      .intersperse("\n")
-      .pipe(text.utf8Encode)
-      .to(io.fileChunkW(to.getAbsolutePath))
-      .run
-      .run
-
-    to.length()
-  }
-}
-
-object TransferTransformFileRunner extends App {
-  def runTransfer(ttf: TransferTransformFile, sizeMB: Int): String = {
-    val output = File.createTempFile("fft", "txt")
-    try {
-      ttf.run(TestFiles.testFile(sizeMB), output).toString
-    } finally output.delete()
-  }
-
-  val tests = List(
-    (ScalazStreamsTransferTransformFile, 10),
-    (ScalazStreamsTransferTransformFile, 100),
-    (AkkaStreamsTransferTransformFile, 10),
-    (AkkaStreamsTransferTransformFile, 100)
-  )
-
-  runTests(tests.map { case (ttf, sizeMB) =>
-    (s"${if (ttf == ScalazStreamsTransferTransformFile) "scalaz" else "akka"}, $sizeMB MB",
-      () => runTransfer(ttf, sizeMB))
-  }, 3)
-
-  AkkaStreamsTransferTransformFile.shutdown()
-}
-
 // http://doc.akka.io/docs/akka-stream-and-http-experimental/1.0-RC2/scala/stream-cookbook.html
 class ParseLinesStage(separator: String, maximumLineBytes: Int) extends StatefulStage[ByteString, String] {
   private val separatorBytes = ByteString(separator)
@@ -147,3 +109,42 @@ class IntersperseStage[T](intersperseElement: T) extends StatefulStage[T, T] {
     }
   }
 }
+
+object ScalazStreamsTransferTransformFile extends TransferTransformFile {
+  override def run(from: File, to: File) = {
+    io.linesR(from.getAbsolutePath)
+      .filter(!_.contains("#!@"))
+      .map(_.replace("*", "0"))
+      .intersperse("\n")
+      .pipe(text.utf8Encode)
+      .to(io.fileChunkW(to.getAbsolutePath))
+      .run
+      .run
+
+    to.length()
+  }
+}
+
+object TransferTransformFileRunner extends App {
+  def runTransfer(ttf: TransferTransformFile, sizeMB: Int): String = {
+    val output = File.createTempFile("fft", "txt")
+    try {
+      ttf.run(TestFiles.testFile(sizeMB), output).toString
+    } finally output.delete()
+  }
+
+  val tests = List(
+    (ScalazStreamsTransferTransformFile, 10),
+    (ScalazStreamsTransferTransformFile, 100),
+    (AkkaStreamsTransferTransformFile, 10),
+    (AkkaStreamsTransferTransformFile, 100)
+  )
+
+  runTests(tests.map { case (ttf, sizeMB) =>
+    (s"${if (ttf == ScalazStreamsTransferTransformFile) "scalaz" else "akka"}, $sizeMB MB",
+      () => runTransfer(ttf, sizeMB))
+  }, 3)
+
+  AkkaStreamsTransferTransformFile.shutdown()
+}
+
