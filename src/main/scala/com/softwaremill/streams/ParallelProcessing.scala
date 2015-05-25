@@ -29,8 +29,9 @@ object AkkaStreamsParallelProcessing extends ParallelProcessing {
       val f = Flow[Int].map { el => Thread.sleep(1000L); el * 2 }
 
       start ~> split.in
-               split.out0 ~> f ~> merge ~> sink
+               split.out0 ~> f ~> merge
                split.out1 ~> f ~> merge
+                                  merge ~> sink
     }
 
     implicit val system = ActorSystem()
