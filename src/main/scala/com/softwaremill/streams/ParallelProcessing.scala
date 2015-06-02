@@ -2,7 +2,7 @@ package com.softwaremill.streams
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.FlexiRoute.{DemandFromAll, RouteLogic}
-import akka.stream.{OperationAttributes, FanOutShape2, ActorFlowMaterializer}
+import akka.stream.{UniformFanOutShape, OperationAttributes, FanOutShape2, ActorFlowMaterializer}
 import akka.stream.scaladsl._
 import akka.stream.scaladsl.FlowGraph.Implicits._
 
@@ -28,10 +28,10 @@ object AkkaStreamsParallelProcessing extends ParallelProcessing {
 
       val f = Flow[Int].map { el => Thread.sleep(1000L); el * 2 }
 
-      start ~> split.in
-               split.out0 ~> f ~> merge
-               split.out1 ~> f ~> merge
-                                  merge ~> sink
+      start ~> split
+               split ~> f ~> merge
+               split ~> f ~> merge
+                             merge ~> sink
     }
 
     implicit val system = ActorSystem()
@@ -40,14 +40,14 @@ object AkkaStreamsParallelProcessing extends ParallelProcessing {
   }
 }
 
-class SplitRoute[T](splitFn: T => Either[T, T]) extends FlexiRoute[T, FanOutShape2[T, T, T]](
-  new FanOutShape2("SplitRoute"), OperationAttributes.name("SplitRoute")) {
+class SplitRoute[T](splitFn: T => Either[T, T]) extends FlexiRoute[T, UniformFanOutShape[T, T]](
+  new UniformFanOutShape(2), OperationAttributes.name("SplitRoute")) {
 
-  override def createRouteLogic(s: FanOutShape2[T, T, T]) = new RouteLogic[T] {
-    override def initialState = State[Unit](DemandFromAll(s.out0, s.out1)) { (ctx, _, el) =>
+  override def createRouteLogic(s: UniformFanOutShape[T, T]) = new RouteLogic[T] {
+    override def initialState = State[Unit](DemandFromAll(s.out(0), s.out(1))) { (ctx, _, el) =>
       splitFn(el) match {
-        case Left(e) => ctx.emit(s.out0)(e)
-        case Right(e) => ctx.emit(s.out1)(e)
+        case Left(e) => ctx.emit(s.out(0))(e)
+        case Right(e) => ctx.emit(s.out(1))(e)
       }
       SameState
     }
