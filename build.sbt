@@ -8,12 +8,14 @@ scalaVersion := "2.11.6"
 
 val akkaVersion = "2.3.10"
 
+resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases"
+
 libraryDependencies ++= Seq(
   // akka
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-experimental" % "1.0-RC3",
   // scalaz
-  "org.scalaz.stream" %% "scalaz-stream" % "0.7a",
+  "org.scalaz.stream" %% "scalaz-stream" % "0.7.1a",
   // util
   "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
   "ch.qos.logback" % "logback-classic" % "1.1.3",
