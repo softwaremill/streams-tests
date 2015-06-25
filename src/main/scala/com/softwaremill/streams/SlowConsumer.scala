@@ -22,7 +22,7 @@ object AkkaSlowConsumer extends App {
       }
 
     Await.result(future, 1.hour)
-  } finally system.shutdowUpdating akka-streamn akka ak()
+  } finally system.shutdown()
 }
 
 object ScalazSlowConsumer extends App {
