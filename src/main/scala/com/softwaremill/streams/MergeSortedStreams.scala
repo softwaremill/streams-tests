@@ -28,13 +28,13 @@ object AkkaStreamsMergeSortedStreams extends MergeSortedStreams {
     }
 
     implicit val system = ActorSystem()
-    implicit val mat = ActorFlowMaterializer()
+    implicit val mat = ActorMaterializer()
     try Await.result(g.run(), 1.hour).reverse finally system.shutdown()
   }
 }
 
 class SortedMerge[T: Ordering] extends FlexiMerge[T, FanInShape2[T, T, T]](
-  new FanInShape2("SortedMerge"), OperationAttributes.name("SortedMerge")) {
+  new FanInShape2("SortedMerge"), Attributes.name("SortedMerge")) {
 
   import akka.stream.scaladsl.FlexiMerge._
 

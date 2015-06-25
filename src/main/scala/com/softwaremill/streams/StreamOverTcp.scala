@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.Semaphore
 
 import akka.actor.ActorSystem
-import akka.stream.ActorFlowMaterializer
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl._
 import akka.stream.io.Implicits._
@@ -43,7 +43,7 @@ object AkkaStreamsStreamOverTcp extends StreamOverTcp {
 
   override def server(unbindSemaphore: Semaphore): Unit = {
     implicit val system = ActorSystem()
-    implicit val mat = ActorFlowMaterializer()
+    implicit val mat = ActorMaterializer()
 
     try {
       def connectionHandler(conn: Tcp.IncomingConnection): Unit = FlowGraph.closed() { implicit builder =>
@@ -80,7 +80,7 @@ object AkkaStreamsStreamOverTcp extends StreamOverTcp {
 
   override def client(): Unit = {
     implicit val system = ActorSystem()
-    implicit val mat = ActorFlowMaterializer()
+    implicit val mat = ActorMaterializer()
 
     val serverConnection = Tcp().outgoingConnection(AddressInterface, AddressPort)
 

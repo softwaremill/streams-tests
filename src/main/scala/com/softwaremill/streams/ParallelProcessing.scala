@@ -2,7 +2,7 @@ package com.softwaremill.streams
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.FlexiRoute.{DemandFromAll, RouteLogic}
-import akka.stream.{UniformFanOutShape, OperationAttributes, FanOutShape2, ActorFlowMaterializer}
+import akka.stream.{UniformFanOutShape, Attributes, ActorMaterializer}
 import akka.stream.scaladsl._
 import akka.stream.scaladsl.FlowGraph.Implicits._
 
@@ -35,13 +35,13 @@ object AkkaStreamsParallelProcessing extends ParallelProcessing {
     }
 
     implicit val system = ActorSystem()
-    implicit val mat = ActorFlowMaterializer()
+    implicit val mat = ActorMaterializer()
     try Await.result(g.run(), 1.hour).reverse finally system.shutdown()
   }
 }
 
 class SplitRoute[T](splitFn: T => Either[T, T]) extends FlexiRoute[T, UniformFanOutShape[T, T]](
-  new UniformFanOutShape(2), OperationAttributes.name("SplitRoute")) {
+  new UniformFanOutShape(2), Attributes.name("SplitRoute")) {
 
   override def createRouteLogic(s: UniformFanOutShape[T, T]) = new RouteLogic[T] {
     override def initialState = State[Unit](DemandFromAll(s.out(0), s.out(1))) { (ctx, _, el) =>

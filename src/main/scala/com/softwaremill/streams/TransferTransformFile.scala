@@ -3,7 +3,7 @@ package com.softwaremill.streams
 import java.io.File
 
 import akka.actor.ActorSystem
-import akka.stream.ActorFlowMaterializer
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.io.Implicits._
 import akka.stream.stage.{SyncDirective, Context, StatefulStage}
@@ -27,7 +27,7 @@ object AkkaStreamsTransferTransformFile extends TransferTransformFile {
   private lazy implicit val system = ActorSystem()
 
   override def run(from: File, to: File) = {
-    implicit val mat = ActorFlowMaterializer()
+    implicit val mat = ActorMaterializer()
 
     val r: Future[Long] = Source.synchronousFile(from)
       .transform(() => new ParseLinesStage("\n", 1048576))

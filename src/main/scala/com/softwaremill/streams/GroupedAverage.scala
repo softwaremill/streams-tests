@@ -1,11 +1,10 @@
 package com.softwaremill.streams
 
 import akka.actor.ActorSystem
-import akka.stream.ActorFlowMaterializer
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
 import com.softwaremill.streams.util.Timed._
 
-import scala.collection.immutable
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scalaz.stream.{Process, Process0}
@@ -18,7 +17,7 @@ object AkkaStreamsGroupedAverage extends GroupedAverage {
   private lazy implicit val system = ActorSystem()
 
   def run(input: () => Iterator[Int]): Option[Double] = {
-    implicit val mat = ActorFlowMaterializer()
+    implicit val mat = ActorMaterializer()
 
     val r = Source(input)
       .mapConcat(n => List(n, n+1))

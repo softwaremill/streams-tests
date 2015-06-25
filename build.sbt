@@ -13,7 +13,7 @@ resolvers += "Scalaz Bintray Repo" at "https://dl.bintray.com/scalaz/releases"
 libraryDependencies ++= Seq(
   // akka
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-  "com.typesafe.akka" %% "akka-stream-experimental" % "1.0-RC3",
+  "com.typesafe.akka" %% "akka-stream-experimental" % "1.0-RC4",
   // scalaz
   "org.scalaz.stream" %% "scalaz-stream" % "0.7.1a",
   // util
