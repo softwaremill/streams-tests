@@ -13,7 +13,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-experimental" % "1.0",
   // scalaz
-  "org.scalaz.stream" %% "scalaz-stream" % "0.7.2a",
+  "org.scalaz.stream" %% "scalaz-stream" % "0.8",
   // util
   "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
   "ch.qos.logback" % "logback-classic" % "1.1.3",
