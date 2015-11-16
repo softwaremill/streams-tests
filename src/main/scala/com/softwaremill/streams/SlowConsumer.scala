@@ -2,19 +2,18 @@ package com.softwaremill.streams
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.Source
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
-
-import scalaz.stream.{time, Process, async}
+import scalaz.stream.{Process, async, time}
 
 object AkkaSlowConsumer extends App {
   implicit val system = ActorSystem()
   implicit val mat = ActorMaterializer()
   try {
-    val future = Source(0.millis, 100.millis, 1)
+    val future = Source.tick(0.millis, 100.millis, 1)
       .conflate(identity)(_ + _)
       .runForeach { el =>
         Thread.sleep(1000L)
@@ -22,7 +21,7 @@ object AkkaSlowConsumer extends App {
       }
 
     Await.result(future, 1.hour)
-  } finally system.shutdown()
+  } finally system.terminate()
 }
 
 object ScalazSlowConsumer extends App {

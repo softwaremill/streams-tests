@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.Semaphore
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
+import akka.stream.{ClosedShape, ActorMaterializer}
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl._
 import akka.stream.io.Implicits._
@@ -46,7 +46,7 @@ object AkkaStreamsStreamOverTcp extends StreamOverTcp {
     implicit val mat = ActorMaterializer()
 
     try {
-      def connectionHandler(conn: Tcp.IncomingConnection): Unit = FlowGraph.closed() { implicit builder =>
+      def connectionHandler(conn: Tcp.IncomingConnection): Unit = RunnableGraph.fromGraph(FlowGraph.create() { implicit builder =>
         val chunkCounter = Source(() => Iterator.from(1))
         val fileSource = Source.synchronousFile(TestFile, chunkSize = SendChunkSize)
 
@@ -60,7 +60,9 @@ object AkkaStreamsStreamOverTcp extends StreamOverTcp {
         fileSource   ~> zip.in0
         chunkCounter ~> zip.in1
                         zip.out ~> logSendingChunk ~> conn.flow ~> Sink.ignore
-      }.run()
+
+        ClosedShape
+      }).run()
 
       val (bindFuture, serverFinishedFuture) = Tcp().bind(AddressInterface, AddressPort)
         .toMat(Sink.foreach(connectionHandler))(Keep.both)
@@ -75,7 +77,7 @@ object AkkaStreamsStreamOverTcp extends StreamOverTcp {
 
       Await.result(serverFinishedFuture, 1.hour)
       logger.info("Server finished")
-    } finally system.shutdown()
+    } finally system.terminate()
   }
 
   override def client(): Unit = {
@@ -91,11 +93,11 @@ object AkkaStreamsStreamOverTcp extends StreamOverTcp {
         Thread.sleep(100L)
       })(Keep.right)
 
-    val g = Source.lazyEmpty.via(serverConnection).toMat(bytesReceivedSink)(Keep.right)
+    val g = Source.maybe.via(serverConnection).toMat(bytesReceivedSink)(Keep.right)
     try {
       Await.result(g.run(), 1.hour)
       logger.info("Client finished")
-    } finally system.shutdown()
+    } finally system.terminate()
   }
 
   type Interrupt = Semaphore

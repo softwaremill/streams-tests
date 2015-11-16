@@ -1,8 +1,8 @@
 package com.softwaremill.streams
 
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.FlexiRoute.{DemandFromAll, RouteLogic}
-import akka.stream.{UniformFanOutShape, Attributes, ActorMaterializer}
+import akka.stream.stage.{OutHandler, InHandler, GraphStageLogic, GraphStage}
+import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.scaladsl.FlowGraph.Implicits._
 
@@ -21,38 +21,80 @@ object AkkaStreamsParallelProcessing extends ParallelProcessing {
   override def run(in: List[Int]) = {
     val out = Sink.fold[List[Int], Int](Nil) { case (l, e) => l.+:(e)}
 
-    val g = FlowGraph.closed(out) { implicit builder => sink =>
+    val g = FlowGraph.create(out) { implicit builder => sink =>
       val start = Source(in)
-      val split = builder.add(new SplitRoute[Int](el => if (el % 2 == 0) Left(el) else Right(el)))
+      val split = builder.add(new SplitStage[Int](el => if (el % 2 == 0) Left(el) else Right(el)))
       val merge = builder.add(Merge[Int](2))
 
       val f = Flow[Int].map { el => Thread.sleep(1000L); el * 2 }
 
-      start ~> split
-               split ~> f ~> merge
-               split ~> f ~> merge
-                             merge ~> sink
+      start ~> split.in
+               split.out0 ~> f ~> merge
+               split.out1 ~> f ~> merge
+                                  merge ~> sink
+
+      ClosedShape
     }
 
     implicit val system = ActorSystem()
     implicit val mat = ActorMaterializer()
-    try Await.result(g.run(), 1.hour).reverse finally system.shutdown()
+    try Await.result(RunnableGraph.fromGraph(g).run(), 1.hour).reverse finally system.terminate()
   }
 }
 
-class SplitRoute[T](splitFn: T => Either[T, T]) extends FlexiRoute[T, UniformFanOutShape[T, T]](
-  new UniformFanOutShape(2), Attributes.name("SplitRoute")) {
+class SplitStage[T](splitFn: T => Either[T, T]) extends GraphStage[FanOutShape2[T, T, T]] {
 
-  override def createRouteLogic(s: UniformFanOutShape[T, T]) = new RouteLogic[T] {
-    override def initialState = State[Unit](DemandFromAll(s.out(0), s.out(1))) { (ctx, _, el) =>
-      splitFn(el) match {
-        case Left(e) => ctx.emit(s.out(0))(e)
-        case Right(e) => ctx.emit(s.out(1))(e)
+  val in   = Inlet[T]("SplitStage.in")
+  val out0 = Outlet[T]("SplitStage.out0")
+  val out1 = Outlet[T]("SplitStage.out1")
+
+  override def shape = new FanOutShape2[T, T, T](in, out0, out1)
+
+  override def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
+
+    var pending: Option[(T, Outlet[T])] = None
+    var initialized = false
+
+    setHandler(in, new InHandler {
+      override def onPush() = {
+        val elAndOut = splitFn(grab(in)).fold((_, out0), (_, out1))
+        pending = Some(elAndOut)
+        tryPush()
       }
-      SameState
+
+      override def onUpstreamFinish() = {
+        if (pending.isEmpty) {
+          completeStage()
+        }
+      }
+    })
+
+    List(out0, out1).foreach {
+      setHandler(_, new OutHandler {
+        override def onPull() = {
+          if (!initialized) {
+            initialized = true
+            tryPull(in)
+          }
+
+          tryPush()
+        }
+      })
     }
 
-    override def initialCompletionHandling = eagerClose
+    private def tryPush(): Unit = {
+      pending.foreach { case (el, out) =>
+        if (isAvailable(out)) {
+          push(out, el)
+          tryPull(in)
+          pending = None
+
+          if (isClosed(in)) {
+            completeStage()
+          }
+        }
+      }
+    }
   }
 }
 

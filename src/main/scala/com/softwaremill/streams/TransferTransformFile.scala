@@ -12,7 +12,6 @@ import akka.util.ByteString
 import com.softwaremill.streams.util.TestFiles
 import com.softwaremill.streams.util.Timed._
 
-import scala.annotation.tailrec
 import scala.concurrent.{Await, Future}
 import scalaz.stream.{io, text}
 import scala.concurrent.duration._
@@ -44,7 +43,7 @@ object AkkaStreamsTransferTransformFile extends TransferTransformFile {
   }
 
   def shutdown() = {
-    system.shutdown()
+    system.terminate()
   }
 }
 

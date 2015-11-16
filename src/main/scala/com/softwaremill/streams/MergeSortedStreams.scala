@@ -2,8 +2,9 @@ package com.softwaremill.streams
 
 import akka.actor.ActorSystem
 import akka.stream._
-import akka.stream.scaladsl.{FlexiMerge, Sink, Source, FlowGraph}
+import akka.stream.scaladsl.{RunnableGraph, Sink, Source, FlowGraph}
 import akka.stream.scaladsl.FlowGraph.Implicits._
+import akka.stream.stage.{OutHandler, InHandler, GraphStageLogic, GraphStage}
 import org.scalacheck.{Prop, Gen, Properties}
 
 import scala.concurrent.Await
@@ -19,64 +20,92 @@ object AkkaStreamsMergeSortedStreams extends MergeSortedStreams {
   def merge[T: Ordering](l1: List[T], l2: List[T]): List[T] = {
     val out = Sink.fold[List[T], T](Nil) { case (l, e) => l.+:(e)}
 
-    val g = FlowGraph.closed(out) { implicit builder => sink =>
+    val g = FlowGraph.create(out) { implicit builder => sink =>
       val merge = builder.add(new SortedMerge[T])
 
       Source(l1) ~> merge.in0
       Source(l2) ~> merge.in1
                     merge.out ~> sink.inlet
+
+      ClosedShape
     }
 
     implicit val system = ActorSystem()
     implicit val mat = ActorMaterializer()
-    try Await.result(g.run(), 1.hour).reverse finally system.shutdown()
+    try Await.result(RunnableGraph.fromGraph(g).run(), 1.hour).reverse finally system.terminate()
   }
 }
 
-class SortedMerge[T: Ordering] extends FlexiMerge[T, FanInShape2[T, T, T]](
-  new FanInShape2("SortedMerge"), Attributes.name("SortedMerge")) {
+class SortedMerge[T: Ordering] extends GraphStage[FanInShape2[T, T, T]]() {
 
-  import akka.stream.scaladsl.FlexiMerge._
+  val in0 = Inlet[T]("SortedMerge.in0")
+  val in1 = Inlet[T]("SortedMerge.in1")
+  val out = Outlet[T]("SortedMerge.out")
 
-  override def createMergeLogic(s: FanInShape2[T, T, T]) = new MergeLogic[T] {
-    private var activeInputs = Set(s.in0, s.in1)
-    private var outstanding: Option[T] = None
+  override def shape = new FanInShape2[T, T, T](in0, in1, out)
 
-    override def initialCompletionHandling = CompletionHandling(
-      onUpstreamFinish = (ctx, input) => {
-        activeInputs = activeInputs.filterNot(_ == input)
+  override def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
+    private case class PendingInlet(in: Inlet[T], var v: Option[T], var finished: Boolean)
+    private val left  = PendingInlet(in0, None, finished = false)
+    private val right = PendingInlet(in1, None, finished = false)
+    private var initialized = false
 
-        // TODO: we should emit the outstanding element, if any
-        // see https://github.com/akka/akka/issues/16753
+    List(left, right).foreach { pendingInlet =>
+      setHandler(pendingInlet.in, new InHandler {
+        override def onPush() = {
+          pendingInlet.v = Some(grab(pendingInlet.in))
 
-        activeInputs.headOption match {
-          case Some(active) => echoInputState(active)
-          case None => ctx.finish(); SameState
+          tryPush()
         }
-      },
-      onUpstreamFailure = (ctx, input, cause) => { ctx.fail(cause); SameState })
 
-    override def initialState = State[T](Read(s.in0)) { (ctx, input, l) =>
-      outstanding = Some(l)
-      nextRight(l)
+        override def onUpstreamFinish() = {
+          pendingInlet.finished = true
+
+          tryPush()
+        }
+      })
     }
 
-    def nextLeft(r: T)  = State[T](Read(s.in0)) { (ctx, input, l) => next(ctx, l, r) }
-    def nextRight(l: T) = State[T](Read(s.in1)) { (ctx, input, r) => next(ctx, l, r) }
+    setHandler(out, new OutHandler {
+      override def onPull() = {
+        if (!initialized) {
+          tryPull(in0)
+          tryPull(in1)
+          initialized = true
+        }
 
-    def next(ctx: MergeLogicContext, l: T, r: T): State[T] = if (implicitly[Ordering[T]].lt(l, r)) {
-      ctx.emit(l)
-      outstanding = Some(r)
-      nextLeft(r)
-    } else {
-      ctx.emit(r)
-      outstanding = Some(l)
-      nextRight(l)
+        tryPush()
+      }
+    })
+
+    def tryPush(): Unit = {
+      if (isAvailable(out)) {
+        (left.v, right.v) match {
+          case (Some(l), Some(r)) =>
+            if (implicitly[Ordering[T]].lt(l, r)) {
+              pushPull(l, left)
+            } else {
+              pushPull(r, right)
+            }
+
+          case (Some(l), None) if right.finished =>
+            pushPull(l, left)
+
+          case (None, Some(r)) if left.finished =>
+            pushPull(r, right)
+
+          case (None, None) if left.finished && right.finished =>
+            completeStage()
+
+          case _ => // do nothing
+        }
+      }
     }
 
-    def echoInputState(input: Inlet[T]) = State[T](Read(input)) { (ctx, _, el) =>
-      ctx.emit(el)
-      SameState
+    def pushPull(v: T, pi: PendingInlet): Unit = {
+      push(out, v)
+      tryPull(pi.in)
+      pi.v = None
     }
   }
 }
@@ -115,4 +144,3 @@ object MergeSortedStreamsRunner extends Properties("MergeSortedStreams") {
   addPropertyFor("scalaz", ScalazStreamsMergeSortedStreams)
   addPropertyFor("akka", AkkaStreamsMergeSortedStreams)
 }
-

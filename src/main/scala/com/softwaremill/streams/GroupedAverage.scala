@@ -30,7 +30,7 @@ object AkkaStreamsGroupedAverage extends GroupedAverage {
   }
 
   def shutdown() = {
-    system.shutdown()
+    system.terminate()
   }
 }
 

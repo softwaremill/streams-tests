@@ -6,12 +6,12 @@ version := "0.1-SNAPSHOT"
 
 scalaVersion := "2.11.7"
 
-val akkaVersion = "2.3.13"
+val akkaVersion = "2.4.0"
 
 libraryDependencies ++= Seq(
   // akka
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
-  "com.typesafe.akka" %% "akka-stream-experimental" % "1.0",
+  "com.typesafe.akka" %% "akka-stream-experimental" % "2.0-M1",
   // scalaz
   "org.scalaz.stream" %% "scalaz-stream" % "0.8",
   // util
