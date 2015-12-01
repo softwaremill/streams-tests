@@ -21,11 +21,11 @@ object AkkaStreamsMergeSortedStreams extends MergeSortedStreams {
     val out = Sink.fold[List[T], T](Nil) { case (l, e) => l.+:(e)}
 
     val g = FlowGraph.create(out) { implicit builder => sink =>
-      val merge = builder.add(new SortedMerge[T])
+      val merge = builder.add(new MergeSorted[T])
 
       Source(l1) ~> merge.in0
       Source(l2) ~> merge.in1
-                    merge.out ~> sink.inlet
+      merge.out ~> sink.inlet
 
       ClosedShape
     }
@@ -36,76 +36,62 @@ object AkkaStreamsMergeSortedStreams extends MergeSortedStreams {
   }
 }
 
-class SortedMerge[T: Ordering] extends GraphStage[FanInShape2[T, T, T]]() {
+class MergeSorted[T: Ordering] extends GraphStage[FanInShape2[T, T, T]] {
+  private val left = Inlet[T]("left")
+  private val right = Inlet[T]("right")
+  private val out = Outlet[T]("out")
 
-  val in0 = Inlet[T]("SortedMerge.in0")
-  val in1 = Inlet[T]("SortedMerge.in1")
-  val out = Outlet[T]("SortedMerge.out")
+  override val shape = new FanInShape2(left, right, out)
 
-  override def shape = new FanInShape2[T, T, T](in0, in1, out)
+  override def createLogic(attr: Attributes) = new GraphStageLogic(shape) {
+    import Ordering.Implicits._
 
-  override def createLogic(inheritedAttributes: Attributes) = new GraphStageLogic(shape) {
-    private case class PendingInlet(in: Inlet[T], var v: Option[T], var finished: Boolean)
-    private val left  = PendingInlet(in0, None, finished = false)
-    private val right = PendingInlet(in1, None, finished = false)
-    private var initialized = false
+    setHandler(left, ignoreTerminateInput)
+    setHandler(right, ignoreTerminateInput)
+    setHandler(out, eagerTerminateOutput)
 
-    List(left, right).foreach { pendingInlet =>
-      setHandler(pendingInlet.in, new InHandler {
-        override def onPush() = {
-          pendingInlet.v = Some(grab(pendingInlet.in))
+    def dispatch(l: T, r: T): Unit =
+      if (l < r) {
+        emit(out, l, () => readL(r))
+      } else {
+        emit(out, r, () => readR(l))
+      }
 
-          tryPush()
-        }
+    def emitAndPass(in: Inlet[T], other: T) =
+      () => emit(out, other, () => pullAndPassAlong(in, out))
 
-        override def onUpstreamFinish() = {
-          pendingInlet.finished = true
+    def readL(other: T) = readAndThen(left)(dispatch(_, other))(emitAndPass(right, other))
+    def readR(other: T) = readAndThen(right)(dispatch(other, _))(emitAndPass(left, other))
 
-          tryPush()
-        }
-      })
+    override def preStart(): Unit = readAndThen(left)(readR){ () =>
+      pullAndPassAlong(right, out)
     }
 
-    setHandler(out, new OutHandler {
-      override def onPull() = {
-        if (!initialized) {
-          tryPull(in0)
-          tryPull(in1)
-          initialized = true
-        }
-
-        tryPush()
-      }
-    })
-
-    def tryPush(): Unit = {
-      if (isAvailable(out)) {
-        (left.v, right.v) match {
-          case (Some(l), Some(r)) =>
-            if (implicitly[Ordering[T]].lt(l, r)) {
-              pushPull(l, left)
-            } else {
-              pushPull(r, right)
-            }
-
-          case (Some(l), None) if right.finished =>
-            pushPull(l, left)
-
-          case (None, Some(r)) if left.finished =>
-            pushPull(r, right)
-
-          case (None, None) if left.finished && right.finished =>
-            completeStage()
-
-          case _ => // do nothing
-        }
+    // helper methods
+    def pullAndPassAlong[Out, In <: Out](from: Inlet[In], to: Outlet[Out]): Unit = {
+      if (!isClosed(from)) {
+        if (!hasBeenPulled(from)) pull(from)
+        passAlong(from, to, doFinish = true, doFail = true)
+      } else {
+        completeStage()
       }
     }
 
-    def pushPull(v: T, pi: PendingInlet): Unit = {
-      push(out, v)
-      tryPull(pi.in)
-      pi.v = None
+    def readAndThen[U](in: Inlet[U])(andThen: U => Unit)(onFinish: () => Unit): Unit = {
+      if (isClosed(in)) {
+        onFinish()
+      } else {
+        val previous = getHandler(in)
+        // This handled is only ever going to be used for the finish callback
+        setHandler(in, new InHandler {
+          override def onPush() = ???
+          override def onUpstreamFinish() = onFinish()
+        })
+        read(in) { t =>
+          setHandler(in, previous)
+          andThen(t)
+        }
+      }
     }
   }
 }
