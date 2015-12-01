@@ -26,7 +26,7 @@ object AkkaStreamsParallelProcessing extends ParallelProcessing {
       val split = builder.add(new SplitStage[Int](el => if (el % 2 == 0) Left(el) else Right(el)))
       val merge = builder.add(Merge[Int](2))
 
-      val f = Flow[Int].map { el => Thread.sleep(10L); el * 2 }
+      val f = Flow[Int].map { el => Thread.sleep(1000L); el * 2 }
 
       start ~> split.in
                split.out0 ~> f ~> merge
@@ -101,7 +101,7 @@ object ScalazStreamsParallelProcessing extends ParallelProcessing {
 
 object ParallelProcessingRunner extends App {
   val impls = List(
-    //("scalaz", ScalazStreamsParallelProcessing),
+    ("scalaz", ScalazStreamsParallelProcessing),
     ("akka", AkkaStreamsParallelProcessing)
   )
 
