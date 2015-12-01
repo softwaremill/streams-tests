@@ -21,7 +21,7 @@ object AkkaStreamsMergeSortedStreams extends MergeSortedStreams {
     val out = Sink.fold[List[T], T](Nil) { case (l, e) => l.+:(e)}
 
     val g = FlowGraph.create(out) { implicit builder => sink =>
-      val merge = builder.add(new MergeSorted[T])
+      val merge = builder.add(new SortedMerge[T])
 
       Source(l1) ~> merge.in0
       Source(l2) ~> merge.in1
@@ -36,7 +36,7 @@ object AkkaStreamsMergeSortedStreams extends MergeSortedStreams {
   }
 }
 
-class MergeSorted[T: Ordering] extends GraphStage[FanInShape2[T, T, T]] {
+class SortedMerge[T: Ordering] extends GraphStage[FanInShape2[T, T, T]] {
   private val left = Inlet[T]("left")
   private val right = Inlet[T]("right")
   private val out = Outlet[T]("out")
