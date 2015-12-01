@@ -63,7 +63,7 @@ class MergeSorted[T: Ordering] extends GraphStage[FanInShape2[T, T, T]] {
     def readL(other: T) = readAndThen(left)(dispatch(_, other))(emitAndPass(right, other))
     def readR(other: T) = readAndThen(right)(dispatch(other, _))(emitAndPass(left, other))
 
-    override def preStart(): Unit = readAndThen(left)(readR){ () =>
+    override def preStart() = readAndThen(left)(readR){ () =>
       pullAndPassAlong(right, out)
     }
 
