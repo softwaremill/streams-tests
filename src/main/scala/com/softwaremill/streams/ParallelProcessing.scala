@@ -1,7 +1,7 @@
 package com.softwaremill.streams
 
 import akka.actor.ActorSystem
-import akka.stream.stage.{OutHandler, InHandler, GraphStageLogic, GraphStage}
+import akka.stream.stage.{GraphStageLogic, GraphStage}
 import akka.stream._
 import akka.stream.scaladsl._
 import akka.stream.scaladsl.FlowGraph.Implicits._

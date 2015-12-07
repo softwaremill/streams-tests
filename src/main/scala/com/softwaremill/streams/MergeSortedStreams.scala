@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream._
 import akka.stream.scaladsl.{RunnableGraph, Sink, Source, FlowGraph}
 import akka.stream.scaladsl.FlowGraph.Implicits._
-import akka.stream.stage.{OutHandler, InHandler, GraphStageLogic, GraphStage}
+import akka.stream.stage.{InHandler, GraphStageLogic, GraphStage}
 import org.scalacheck.{Prop, Gen, Properties}
 
 import scala.concurrent.Await
