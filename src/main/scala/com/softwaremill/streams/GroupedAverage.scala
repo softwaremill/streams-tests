@@ -19,7 +19,7 @@ object AkkaStreamsGroupedAverage extends GroupedAverage {
   def run(input: () => Iterator[Int]): Option[Double] = {
     implicit val mat = ActorMaterializer()
 
-    val r = Source(input)
+    val r = Source.fromIterator(input)
       .mapConcat(n => List(n, n+1))
       .filter(_ % 17 != 0)
       .grouped(10)
@@ -57,7 +57,7 @@ object ScalazStreamsGroupedAverage extends GroupedAverage {
 
 object GroupedAverageRunner extends App {
   val impls = List(AkkaStreamsGroupedAverage, ScalazStreamsGroupedAverage)
-  val ranges = List(1000, 100000, 1000000)
+  val ranges = List(1000, 100000, 1000000, 10000000)
 
   val tests = for {
     impl <- impls

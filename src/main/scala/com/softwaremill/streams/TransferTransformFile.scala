@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.stream.io.Framing
-import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.scaladsl.{FileIO, Keep}
 import akka.util.ByteString
 import com.softwaremill.streams.util.TestFiles
 import com.softwaremill.streams.util.Timed._
@@ -27,14 +27,14 @@ object AkkaStreamsTransferTransformFile extends TransferTransformFile {
   override def run(from: File, to: File) = {
     implicit val mat = ActorMaterializer()
 
-    val r: Future[Long] = Source.file(from)
+    val r: Future[Long] = FileIO.fromFile(from)
       .via(Framing.delimiter(ByteString("\n"), 1048576))
       .map(_.utf8String)
       .filter(!_.contains("#!@"))
       .map(_.replace("*", "0"))
       .intersperse("\n")
       .map(ByteString(_))
-      .toMat(Sink.file(to))(Keep.right)
+      .toMat(FileIO.toFile(to))(Keep.right)
       .run()
 
     Await.result(r, 1.hour)

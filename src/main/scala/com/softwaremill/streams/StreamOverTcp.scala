@@ -6,7 +6,7 @@ import java.util.concurrent.Semaphore
 import akka.actor.ActorSystem
 import akka.stream.{ClosedShape, ActorMaterializer}
 import akka.stream.scaladsl._
-import akka.stream.scaladsl.FlowGraph.Implicits._
+import akka.stream.scaladsl.GraphDSL.Implicits._
 import akka.util.ByteString
 import com.softwaremill.streams.util.TestFiles
 import com.typesafe.scalalogging.slf4j.StrictLogging
@@ -44,9 +44,9 @@ object AkkaStreamsStreamOverTcp extends StreamOverTcp {
     implicit val mat = ActorMaterializer()
 
     try {
-      def connectionHandler(conn: Tcp.IncomingConnection): Unit = RunnableGraph.fromGraph(FlowGraph.create() { implicit builder =>
-        val chunkCounter = Source(() => Iterator.from(1))
-        val fileSource = Source.file(TestFile, chunkSize = SendChunkSize)
+      def connectionHandler(conn: Tcp.IncomingConnection): Unit = RunnableGraph.fromGraph(GraphDSL.create() { implicit builder =>
+        val chunkCounter = Source.fromIterator(() => Iterator.from(1))
+        val fileSource = FileIO.fromFile(TestFile, chunkSize = SendChunkSize)
 
         val logSendingChunk = Flow[(ByteString, Int)].map { case (chunk, i) =>
           logger.info(s"Sending chunk $i")

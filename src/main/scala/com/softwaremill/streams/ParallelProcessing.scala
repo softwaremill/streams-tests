@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.stage.{GraphStageLogic, GraphStage}
 import akka.stream._
 import akka.stream.scaladsl._
-import akka.stream.scaladsl.FlowGraph.Implicits._
+import akka.stream.scaladsl.GraphDSL.Implicits._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -21,7 +21,7 @@ object AkkaStreamsParallelProcessing extends ParallelProcessing {
   override def run(in: List[Int]) = {
     val out = Sink.fold[List[Int], Int](Nil) { case (l, e) => l.+:(e)}
 
-    val g = FlowGraph.create(out) { implicit builder => sink =>
+    val g = GraphDSL.create(out) { implicit builder => sink =>
       val start = Source(in)
       val split = builder.add(new SplitStage[Int](el => if (el % 2 == 0) Left(el) else Right(el)))
       val merge = builder.add(Merge[Int](2))
@@ -57,18 +57,13 @@ class SplitStage[T](splitFn: T => Either[T, T]) extends GraphStage[FanOutShape2[
     setHandler(out1, eagerTerminateOutput)
 
     def doRead(): Unit = {
-      if (isClosed(in)) {
-        completeStage()
-      } else {
-        setHandler(in, eagerTerminateInput)
-        read(in) { el =>
-          setHandler(in, ignoreTerminateInput)
-          splitFn(el).fold(doEmit(out0, _), doEmit(out1, _))
-        }
-      }
+      read(in)(
+        el => splitFn(el).fold(doEmit(out0, _), doEmit(out1, _)),
+        () => completeStage()
+      )
     }
 
-    def doEmit(out: Outlet[T], el: T): Unit = emit(out, el, doRead)
+    def doEmit(out: Outlet[T], el: T): Unit = emit(out, el, doRead _)
 
     override def preStart() = doRead()
   }

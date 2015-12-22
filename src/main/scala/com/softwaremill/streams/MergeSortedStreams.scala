@@ -2,15 +2,14 @@ package com.softwaremill.streams
 
 import akka.actor.ActorSystem
 import akka.stream._
-import akka.stream.scaladsl.{RunnableGraph, Sink, Source, FlowGraph}
-import akka.stream.scaladsl.FlowGraph.Implicits._
-import akka.stream.stage.{InHandler, GraphStageLogic, GraphStage}
-import org.scalacheck.{Prop, Gen, Properties}
+import akka.stream.scaladsl.GraphDSL.Implicits._
+import akka.stream.scaladsl.{GraphDSL, RunnableGraph, Sink, Source}
+import akka.stream.stage.{GraphStage, GraphStageLogic}
+import org.scalacheck.{Gen, Prop, Properties}
 
 import scala.concurrent.Await
-import scalaz.stream.{Tee, tee, Process}
-
 import scala.concurrent.duration._
+import scalaz.stream.{Process, Tee, tee}
 
 trait MergeSortedStreams {
   def merge[T: Ordering](l1: List[T], l2: List[T]): List[T]
@@ -20,12 +19,12 @@ object AkkaStreamsMergeSortedStreams extends MergeSortedStreams {
   def merge[T: Ordering](l1: List[T], l2: List[T]): List[T] = {
     val out = Sink.fold[List[T], T](Nil) { case (l, e) => l.+:(e)}
 
-    val g = FlowGraph.create(out) { implicit builder => sink =>
+    val g = GraphDSL.create(out) { implicit builder => sink =>
       val merge = builder.add(new SortedMerge[T])
 
       Source(l1) ~> merge.in0
       Source(l2) ~> merge.in1
-      merge.out ~> sink.inlet
+                    merge.out ~> sink.in
 
       ClosedShape
     }
@@ -58,41 +57,14 @@ class SortedMerge[T: Ordering] extends GraphStage[FanInShape2[T, T, T]] {
       }
 
     def emitAndPass(in: Inlet[T], other: T) =
-      () => emit(out, other, () => pullAndPassAlong(in, out))
+      () => emit(out, other, () => passAlong(in, out, doFinish = true, doFail = true, doPull = true))
 
-    def readL(other: T) = readAndThen(left)(dispatch(_, other))(emitAndPass(right, other))
-    def readR(other: T) = readAndThen(right)(dispatch(other, _))(emitAndPass(left, other))
+    def readL(other: T) = read(left)(dispatch(_, other), emitAndPass(right, other))
+    def readR(other: T) = read(right)(dispatch(other, _), emitAndPass(left, other))
 
-    override def preStart() = readAndThen(left)(readR){ () =>
-      pullAndPassAlong(right, out)
-    }
-
-    // helper methods
-    def pullAndPassAlong[Out, In <: Out](from: Inlet[In], to: Outlet[Out]): Unit = {
-      if (!isClosed(from)) {
-        if (!hasBeenPulled(from)) pull(from)
-        passAlong(from, to, doFinish = true, doFail = true)
-      } else {
-        completeStage()
-      }
-    }
-
-    def readAndThen[U](in: Inlet[U])(andThen: U => Unit)(onFinish: () => Unit): Unit = {
-      if (isClosed(in)) {
-        onFinish()
-      } else {
-        val previous = getHandler(in)
-        // This handled is only ever going to be used for the finish callback
-        setHandler(in, new InHandler {
-          override def onPush() = ???
-          override def onUpstreamFinish() = onFinish()
-        })
-        read(in) { t =>
-          setHandler(in, previous)
-          andThen(t)
-        }
-      }
-    }
+    override def preStart() = read(left)(readR,
+      () => passAlong(right, out, doFinish = true, doFail = true, doPull = true)
+    )
   }
 }
 
