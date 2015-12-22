@@ -26,7 +26,7 @@ object AkkaStreamsParallelProcessing extends ParallelProcessing {
       val split = builder.add(new SplitStage[Int](el => if (el % 2 == 0) Left(el) else Right(el)))
       val merge = builder.add(Merge[Int](2))
 
-      val f = Flow[Int].map { el => Thread.sleep(1000L); el * 2 }
+      val f = Flow[Int].map { el => Thread.sleep(1000L); el * 2 }.addAttributes(Attributes.asyncBoundary)
 
       start ~> split.in
                split.out0 ~> f ~> merge
